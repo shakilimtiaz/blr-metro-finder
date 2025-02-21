@@ -3,18 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Find Bangalore Metro</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Bangalore Metro Finder</title>
+
+    <!-- Leaflet & Autocomplete Libraries -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://nominatim.openstreetmap.org/ui/js/nominatim.autocomplete.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Find Your Nearest Bangalore Metro</h1>
-    
-    <button onclick="getCurrentLocation()">Use My Location</button>
+    <h1>Bangalore Metro Finder</h1>
 
-    <input id="destinationInput" type="text" placeholder="Enter destination">
+    <button onclick="getCurrentLocation()">📍 Use My Location</button>
+
+    <input id="locationInput" type="text" placeholder="Enter a destination">
     <button onclick="findDestinationMetro()">Find Metro</button>
 
     <div id="map"></div>
