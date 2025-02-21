@@ -73,30 +73,67 @@ const metroStations = {
     ],
 };
 
-// 📌 Enable Autocomplete Search with Location Suggestions (Restrict to Bangalore)
+// 📌 Enable Real-time Autocomplete Dropdown
 let searchBox = document.getElementById("locationInput");
+let dropdown = document.createElement("ul");
+dropdown.setAttribute("id", "autocomplete-dropdown");
+dropdown.style.position = "absolute";
+dropdown.style.zIndex = "1000";
+dropdown.style.backgroundColor = "white";
+dropdown.style.border = "1px solid #ccc";
+dropdown.style.listStyleType = "none";
+dropdown.style.padding = "5px";
+dropdown.style.margin = "0";
+dropdown.style.maxHeight = "200px";
+dropdown.style.overflowY = "auto";
+document.body.appendChild(dropdown);
+
 searchBox.addEventListener("input", function () {
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchBox.value}&countrycodes=IN&bounded=1&viewbox=77.3,13.5,78.0,12.5&limit=5`)
+    let query = searchBox.value.trim();
+    
+    if (query.length < 3) {
+        dropdown.innerHTML = "";
+        dropdown.style.display = "none";
+        return;
+    }
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&countrycodes=IN&bounded=1&viewbox=77.3,13.5,78.0,12.5&limit=5`)
         .then(response => response.json())
         .then(data => {
-            let dropdown = document.createElement("ul");
-            dropdown.setAttribute("id", "autocomplete-dropdown");
             dropdown.innerHTML = "";
+            if (data.length === 0) {
+                dropdown.style.display = "none";
+                return;
+            }
 
             data.forEach(place => {
                 let item = document.createElement("li");
                 item.textContent = place.display_name;
+                item.style.cursor = "pointer";
+                item.style.padding = "5px";
+                item.style.borderBottom = "1px solid #ddd";
+
                 item.addEventListener("click", function () {
                     searchBox.value = place.display_name;
-                    document.body.removeChild(dropdown);
+                    dropdown.innerHTML = "";
+                    dropdown.style.display = "none";
                 });
+
                 dropdown.appendChild(item);
             });
 
-            let existingDropdown = document.getElementById("autocomplete-dropdown");
-            if (existingDropdown) document.body.removeChild(existingDropdown);
-            document.body.appendChild(dropdown);
+            let rect = searchBox.getBoundingClientRect();
+            dropdown.style.left = `${rect.left}px`;
+            dropdown.style.top = `${rect.bottom}px`;
+            dropdown.style.width = `${rect.width}px`;
+            dropdown.style.display = "block";
         });
+});
+
+document.addEventListener("click", function (e) {
+    if (e.target !== searchBox) {
+        dropdown.style.display = "none";
+    }
 });
 
 // 📌 Get User's Current Location
@@ -220,17 +257,4 @@ function drawRoute(start, end) {
             routeLayer = L.geoJSON(data.routes[0].geometry, { color: 'blue' }).addTo(map);
         })
         .catch(error => console.error("Error:", error));
-}
-
-// 📌 Helper function to calculate distance between two coordinates
-function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of Earth in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
 }
