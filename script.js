@@ -6,17 +6,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Add Autocomplete Search Box
-let searchControl = L.Control.geocoder({
-    defaultMarkGeocode: false
-}).addTo(map);
-
-searchControl.on('markgeocode', function(e) {
-    let location = e.geocode.center;
-    map.setView(location, 14);
-    L.marker(location).addTo(map).bindPopup(e.geocode.name).openPopup();
-});
-
 // Markers and Routes
 let userMarker, destinationMarker, userMetroMarker, destinationMetroMarker, routeLayer;
 
@@ -84,27 +73,31 @@ const metroStations = {
     ],
 };
 
-// 📌 Draw Metro Lines with Correct Colors
-function drawMetroLines() {
-    const metroColors = {
-        purple: "purple",
-        green: "green",
-    };
+// 📌 Enable Autocomplete Search with Location Suggestions (Restrict to Bangalore)
+let searchBox = document.getElementById("locationInput");
+searchBox.addEventListener("input", function () {
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchBox.value}&countrycodes=IN&bounded=1&viewbox=77.3,13.5,78.0,12.5&limit=5`)
+        .then(response => response.json())
+        .then(data => {
+            let dropdown = document.createElement("ul");
+            dropdown.setAttribute("id", "autocomplete-dropdown");
+            dropdown.innerHTML = "";
 
-    for (let line in metroStations) {
-        let latLngs = metroStations[line].map(station => [station.lat, station.lon]);
+            data.forEach(place => {
+                let item = document.createElement("li");
+                item.textContent = place.display_name;
+                item.addEventListener("click", function () {
+                    searchBox.value = place.display_name;
+                    document.body.removeChild(dropdown);
+                });
+                dropdown.appendChild(item);
+            });
 
-        L.polyline(latLngs, { color: metroColors[line], weight: 4 }).addTo(map);
-
-        metroStations[line].forEach(station => {
-            L.marker([station.lat, station.lon]).addTo(map)
-                .bindPopup(`${station.name} (${line.charAt(0).toUpperCase() + line.slice(1)} Line)`);
+            let existingDropdown = document.getElementById("autocomplete-dropdown");
+            if (existingDropdown) document.body.removeChild(existingDropdown);
+            document.body.appendChild(dropdown);
         });
-    }
-}
-
-// Draw Metro Lines on Map
-drawMetroLines();
+});
 
 // 📌 Get User's Current Location
 function getCurrentLocation() {
@@ -136,7 +129,7 @@ function findNearestMetro(lat, lon, type) {
     let allStations = [...metroStations.purple, ...metroStations.green];
 
     allStations.forEach(station => {
-        let distance = Math.sqrt(Math.pow(station.lat - lat, 2) + Math.pow(station.lon - lon, 2));
+        let distance = getDistanceFromLatLonInKm(lat, lon, station.lat, station.lon);
         if (distance < minDistance) {
             minDistance = distance;
             nearest = station;
@@ -162,6 +155,22 @@ function findNearestMetro(lat, lon, type) {
     }
 }
 
+// 📌 Restrict Locations to Bangalore (100km Rule)
+function isLocationInBangalore(lat, lon) {
+    let withinRange = false;
+
+    let allStations = [...metroStations.purple, ...metroStations.green];
+
+    allStations.forEach(station => {
+        let distance = getDistanceFromLatLonInKm(lat, lon, station.lat, station.lon);
+        if (distance <= 100) {
+            withinRange = true;
+        }
+    });
+
+    return withinRange;
+}
+
 // 📌 Handle Destination Search
 function findDestinationMetro() {
     let destinationInput = document.getElementById("locationInput").value;
@@ -172,7 +181,7 @@ function findDestinationMetro() {
     }
 
     // Convert destination to coordinates
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${destinationInput}`)
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${destinationInput}&countrycodes=IN&bounded=1&viewbox=77.3,13.5,78.0,12.5&limit=1`)
         .then(response => response.json())
         .then(data => {
             if (data.length === 0) {
@@ -183,6 +192,12 @@ function findDestinationMetro() {
             let destLat = data[0].lat;
             let destLon = data[0].lon;
             let destinationLocation = [destLat, destLon];
+
+            // 🚨 If the location is outside Bangalore, alert user
+            if (!isLocationInBangalore(destLat, destLon)) {
+                alert("This location is outside Bangalore.");
+                return;
+            }
 
             if (destinationMarker) map.removeLayer(destinationMarker);
             destinationMarker = L.marker(destinationLocation).addTo(map)
@@ -205,4 +220,17 @@ function drawRoute(start, end) {
             routeLayer = L.geoJSON(data.routes[0].geometry, { color: 'blue' }).addTo(map);
         })
         .catch(error => console.error("Error:", error));
+}
+
+// 📌 Helper function to calculate distance between two coordinates
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of Earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
